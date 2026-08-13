@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, Uuid, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -46,3 +46,15 @@ class Location(Base):
     description: Mapped[str] = mapped_column(String(500))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # Free-form position/size on the per-Warehouse visual Layout canvas --
+    # purely a display concern, never read by id_generator_service or any
+    # formula logic. NULL means "not yet placed on the canvas" (the
+    # frontend auto-arranges those into a grid on first load rather than
+    # stacking them at 0,0). No grid-snapping -- width/height are whatever
+    # the admin dragged them to, matching the real floor-plan reference
+    # the layout feature was modeled on.
+    layout_x: Mapped[float | None] = mapped_column(Float, nullable=True)
+    layout_y: Mapped[float | None] = mapped_column(Float, nullable=True)
+    layout_width: Mapped[float | None] = mapped_column(Float, nullable=True)
+    layout_height: Mapped[float | None] = mapped_column(Float, nullable=True)

@@ -9,8 +9,13 @@ from app.db.session import get_db
 from app.models.location import Location
 from app.models.revision import Revision
 from app.models.warehouse import Warehouse
-from app.schemas.location import LocationCreate, LocationRead, LocationReassignWarehouse, LocationUpdate
-from app.services.location_service import create_location, delete_location, reassign_location_warehouse
+from app.schemas.location import LocationCreate, LocationLayoutUpdate, LocationRead, LocationReassignWarehouse, LocationUpdate
+from app.services.location_service import (
+    create_location,
+    delete_location,
+    reassign_location_warehouse,
+    update_location_layout,
+)
 
 router = APIRouter(prefix="/locations", tags=["locations"], dependencies=[Depends(get_current_user)])
 
@@ -104,6 +109,17 @@ def update_location(location_id: uuid.UUID, payload: LocationUpdate, db: Session
     db.commit()
     db.refresh(location)
     return location
+
+
+@router.patch(
+    "/{location_id}/layout", response_model=LocationRead, dependencies=[Depends(require_role("admin"))]
+)
+def update_location_layout_endpoint(
+    location_id: uuid.UUID, payload: LocationLayoutUpdate, db: Session = Depends(get_db)
+) -> Location:
+    """Persists this Location's position/size on the Warehouse Layout
+    canvas -- see location_service.update_location_layout's docstring."""
+    return update_location_layout(db, location_id, payload.layout_x, payload.layout_y, payload.layout_width, payload.layout_height)
 
 
 @router.post(

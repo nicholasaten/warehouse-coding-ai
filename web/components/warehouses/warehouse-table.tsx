@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { GitMerge, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { GitMerge, LayoutGrid, Trash2 } from "lucide-react";
 
 import { Badge, OccupancyBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -78,6 +79,15 @@ function WarehouseRow({
               onEdit={() => setMode("edit")}
               onRequestRevision={() => setMode("request")}
             />
+            {isAdmin && (
+              <Link
+                href={`/warehouses/${warehouse.id}/layout`}
+                className="inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-ink-dim transition-colors hover:bg-accent-wash hover:text-ink"
+              >
+                <LayoutGrid className="h-4 w-4" />
+                Layout
+              </Link>
+            )}
             {isAdmin && (
               <Button variant="ghost" disabled={isDeleting} onClick={() => setMode("merge")}>
                 <GitMerge className="h-4 w-4" />

@@ -553,6 +553,80 @@ that into a single admin action instead of clicking Move on every row.
   backend process for a clean pool. Cleaned up the disposable warehouse/
   Locations and the throwaway verification admin account afterward.
 
+### Phase 10 -- Warehouse Layout canvas
+
+Requested directly, with a reference floor-plan image: a Figma-like
+canvas per Warehouse where each Location is a draggable, freely-resizable
+box (no grid-snapping), matching how the user actually thinks about a
+physical warehouse. Scoped deliberately to Locations only -- the
+reference image also had free-form annotations with no equivalent in the
+data model (walls, section labels, flow arrows); those were explicitly
+cut from this phase rather than inventing a new untracked-shape system
+alongside it.
+
+- Migration `0010`: four new nullable columns on `locations` --
+  `layout_x`/`layout_y`/`layout_width`/`layout_height` (all `Float`).
+  NULL means "never placed" -- purely a display concern, never read by
+  `id_generator_service` or any formula/code-generation logic.
+- `PATCH /locations/{id}/layout`, admin-only, `{layout_x, layout_y,
+  layout_width, layout_height}` -- no Revision-pending guard, unlike
+  every other Location mutation, since a layout position has no
+  real-world meaning for a PIC to review.
+- Frontend: `LayoutCanvas` -- a custom drag/resize implementation using
+  raw Pointer Events (`onPointerDown`/`onPointerMove`/`onPointerUp` +
+  `setPointerCapture`, wrapped in try/catch since not every input source
+  supports capture), deliberately not a new npm dependency -- the
+  interaction is simple enough (move + one resize handle, no rotation,
+  no multi-select) that a library would have been more surface area than
+  the problem needed. Locations that have never been placed
+  (`layout_x` still NULL) auto-arrange into a left-to-right grid on
+  first load rather than stacking at (0,0). Saves automatically on
+  pointer-up, no explicit Save button. New page at
+  `/warehouses/{id}/layout`, reached via a "Layout" link (admin-only)
+  next to Edit/Merge/Delete in the Warehouses table.
+- 3 new SQLite tests (successful update, not-found, non-positive
+  width/height rejected). 121 tests total.
+- Live-verified locally in a real browser: created a disposable
+  warehouse with two real Locations, dragged one and resized the other
+  via synthetic Pointer Events, confirmed both actions updated on-screen
+  immediately, persisted to Postgres correctly (checked directly), and
+  survived a full page reload with the exact saved position/size --
+  proving the whole round trip, not just the click handler. **One real
+  bug caught and fixed during this same pass**: the initial
+  `setPointerCapture` call had no error handling, which would silently
+  break the entire drag on any input source or environment where pointer
+  capture isn't available -- wrapped in try/catch, since the drag logic
+  itself doesn't actually depend on capture succeeding (the move/up
+  listeners are on the box itself, capture just keeps tracking if the
+  cursor outruns the box while dragging fast).
+
+### Shipping to real hosting (Vercel + Render)
+
+Moved off the Cloudflare quick-tunnel setup (Phase 6d) once the app was
+stable enough to share persistently -- tunnels have no uptime guarantee
+and mint a new URL on every restart, which stopped being acceptable once
+people were actually using the shared link day-to-day. Pushed the repo
+to GitHub (`nicholasaten/warehouse-coding-ai`), then:
+
+- **Backend on Render** -- Web Service rooted at `api/`, build command
+  `pip install -r requirements.txt`, start command `uvicorn app.main:app
+  --host 0.0.0.0 --port $PORT`, free tier. **Render defaulted to Python
+  3.14, which has no prebuilt wheel yet for this project's pinned
+  `pydantic-core==2.27.2`** -- pip fell back to compiling it from Rust
+  source via `maturin`, which failed outright on Render's read-only
+  build filesystem. A `runtime.txt`/`.python-version` file alone wasn't
+  picked up by Render's current native-Python build path; the reliable
+  fix was setting the `PYTHON_VERSION=3.11.9` environment variable
+  directly in the Render dashboard, matching local dev exactly.
+- **Frontend on Vercel** -- rooted at `web/`, framework auto-detected as
+  Next.js, `NEXT_PUBLIC_API_URL` env var pointed at the Render URL.
+- Same CORS/cookie wiring as the tunnel setup required (`CORS_ORIGINS` on
+  the backend set to the exact Vercel URL, `COOKIE_SAMESITE=none` since
+  frontend and backend are genuinely cross-site) -- the underlying
+  reasoning carries over unchanged from Phase 6's tunnel writeup.
+- Free-tier Render services spin down after ~15 minutes idle; the first
+  request after that takes 30-50s to wake, which is expected, not a bug.
+
 **Frontend (`web/`)** -- Next.js 16 + TypeScript + Tailwind, same
 architecture as the sibling WMS Readiness Tracker (in-memory access token,
 httpOnly refresh cookie, client-side route guard) but its **own visual

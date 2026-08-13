@@ -60,6 +60,10 @@ export type Location = {
   is_active: boolean;
   created_at: string;
   has_pending_revision: boolean;
+  layout_x: number | null;
+  layout_y: number | null;
+  layout_width: number | null;
+  layout_height: number | null;
 };
 
 export type UserAccount = {

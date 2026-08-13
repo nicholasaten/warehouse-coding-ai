@@ -20,7 +20,12 @@ from app.models.site import Site
 from app.models.warehouse import Warehouse
 from app.models.warehouse_code import WarehouseCodeConfig
 from app.models.warehouse_type import WarehouseTypeConfig
-from app.services.location_service import create_location, delete_location, reassign_location_warehouse
+from app.services.location_service import (
+    create_location,
+    delete_location,
+    reassign_location_warehouse,
+    update_location_layout,
+)
 from app.services.warehouse_service import create_warehouse, delete_warehouse, merge_warehouse
 
 import app.models  # noqa: F401  -- registers every model on Base.metadata
@@ -450,4 +455,31 @@ def test_merge_warehouse_target_not_found(db, seeded):
     wh = create_warehouse(db, seeded.id, "A", "01", "Pharmacy Mainstore Drugs", None, None)
     with pytest.raises(HTTPException) as exc_info:
         merge_warehouse(db, wh.id, uuid.uuid4())
+    assert exc_info.value.status_code == 400
+
+
+def test_update_location_layout_success(db, seeded):
+    wh = create_warehouse(db, seeded.id, "A", "01", "Pharmacy Mainstore Drugs", None, None)
+    loc = create_location(db, wh.id, "A", "DRUGS", "DRUGS - PSIKOTROPIKA")
+
+    updated = update_location_layout(db, loc.id, x=120.5, y=80.0, width=200.0, height=90.0)
+
+    assert updated.layout_x == 120.5
+    assert updated.layout_y == 80.0
+    assert updated.layout_width == 200.0
+    assert updated.layout_height == 90.0
+
+
+def test_update_location_layout_not_found(db, seeded):
+    with pytest.raises(HTTPException) as exc_info:
+        update_location_layout(db, uuid.uuid4(), x=0, y=0, width=100, height=50)
+    assert exc_info.value.status_code == 404
+
+
+def test_update_location_layout_rejects_non_positive_size(db, seeded):
+    wh = create_warehouse(db, seeded.id, "A", "01", "Pharmacy Mainstore Drugs", None, None)
+    loc = create_location(db, wh.id, "A", "DRUGS", "DRUGS - PSIKOTROPIKA")
+
+    with pytest.raises(HTTPException) as exc_info:
+        update_location_layout(db, loc.id, x=0, y=0, width=0, height=50)
     assert exc_info.value.status_code == 400

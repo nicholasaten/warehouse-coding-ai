@@ -164,6 +164,29 @@ def reassign_location_warehouse(db: Session, location_id: uuid.UUID, new_warehou
     return location
 
 
+def update_location_layout(
+    db: Session, location_id: uuid.UUID, x: float, y: float, width: float, height: float
+) -> Location:
+    """Persists this Location's position/size on the free-form per-
+    Warehouse Layout canvas. Purely a display concern -- never touches
+    `generated_code` or any formula field, and doesn't check/block on a
+    pending Revision the way edits to real data do, since this has no
+    real-world meaning to review."""
+    location = db.get(Location, location_id)
+    if location is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not found")
+    if width <= 0 or height <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Width and height must be positive")
+
+    location.layout_x = x
+    location.layout_y = y
+    location.layout_width = width
+    location.layout_height = height
+    db.commit()
+    db.refresh(location)
+    return location
+
+
 def delete_location(db: Session, location_id: uuid.UUID) -> None:
     """Hard delete. Blocked while a Revision is still pending on it, same
     reasoning as delete_warehouse. Deliberately does NOT re-sequence any
