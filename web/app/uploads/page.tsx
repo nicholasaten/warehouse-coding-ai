@@ -1,6 +1,7 @@
 "use client";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { HospitalUnitExportPanel } from "@/components/uploads/hospital-unit-export-panel";
 import { UploadPanel } from "@/components/uploads/upload-panel";
 
 export default function UploadsPage() {
@@ -28,6 +29,8 @@ export default function UploadsPage() {
             onUploaded={() => {}}
           />
         </div>
+
+        <HospitalUnitExportPanel />
       </div>
     </AppShell>
   );

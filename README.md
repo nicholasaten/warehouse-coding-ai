@@ -600,6 +600,66 @@ alongside it.
   listeners are on the box itself, capture just keeps tracking if the
   cursor outruns the box while dragging fast).
 
+### Phase 11 -- Download a Hospital Unit's Warehouse/Location data as .xlsx
+
+Requested directly, with the real `RSUS Mapping.xlsx` reference file
+attached: a per-Hospital-Unit export that can be edited and re-uploaded
+whenever needed. Deliberately did NOT mirror that reference file's own
+columns (`Hope Store Code`, `F&O Warehouse Code`, etc.) -- those are
+one-time legacy-migration artifacts specific to that file's history, with
+no equivalent anywhere in this system, and building an export for
+columns nothing can re-ingest would fail the actual requirement
+("importable"). Instead, `export_site_master` produces a workbook in the
+**exact column format the Uploads page's own Warehouse Master/Location
+Master endpoints already require** (`excel_ingest_service`'s
+`_require_columns`) -- so the file that comes out is guaranteed
+re-uploadable through the same page, unchanged, no reformatting.
+
+- `export_service.export_site_master(db, site_id)` -- two sheets in one
+  workbook ("Warehouse Master", "Location Master"), populated from that
+  Site's current Warehouses/Locations. Each sheet also carries one extra
+  informational "Generated Code" column (ignored on re-upload -- the
+  importer only checks for the columns it requires, an extra column is
+  harmless) so a human opening the file can cross-reference the real
+  code without needing to look anything up.
+- `GET /exports/hospital-unit?site_id=...`, admin-only (matching
+  `/uploads`'s own restriction), returns the file as a real download
+  (`Content-Disposition: attachment`).
+- Frontend: a "Download Hospital Unit Export" card on the Uploads page,
+  right below the two upload panels -- a Hospital Unit picker and a
+  Download button, using a Blob + temporary `<a download>` element since
+  this needs the same Bearer-token auth as every other API call (a plain
+  `<a href>` to the API can't carry that header).
+- 4 new SQLite tests, including one that proves the actual claim, not
+  just that the file looks right: **export a site, feed the exported
+  file back through the real `ingest_warehouse_master`/
+  `ingest_location_master` functions into a completely fresh database,
+  and confirm the recreated Warehouses/Locations have the identical
+  generated codes as the originals.** 125 tests total.
+- **Live-verified the full loop against the real Neon database**, not
+  just SQLite: downloaded the real RSUS export (37 warehouses, 8
+  locations) through the actual browser UI, then independently fetched
+  the same file via `curl` and re-posted its two sheets straight back
+  through the real `/uploads/warehouse-master` and
+  `/uploads/location-master` endpoints. Result matched the designed
+  behavior exactly: all 37 warehouses updated in place (no duplicates --
+  the upsert key already handles a re-upload correctly, see Phase 1);
+  7 of 8 locations correctly reported as `"Duplicate: ... already exists
+  for this warehouse"` (safe -- no data corruption, nothing silently
+  overwritten).
+- **Surfaced a real, pre-existing round-trip gap while verifying, not
+  introduced by this feature**: 1 of the 8 real locations failed re-
+  import with `"Category Rack is required"` -- that Location was
+  originally created with no Category Rack value (allowed by
+  `create_location`'s own manual-creation path, where it's optional),
+  but `ingest_location_master` has always required that column to be
+  non-empty. **Documented plainly as a known limitation rather than
+  silently expanding this feature's scope to also loosen the importer's
+  validation**: a Location created without a Category Rack cannot
+  currently round-trip through Export → re-Upload. Fixing that would
+  mean changing `ingest_location_master`'s own validation rules, a
+  separate decision from building the export.
+
 ### Shipping to real hosting (Vercel + Render)
 
 Moved off the Cloudflare quick-tunnel setup (Phase 6d) once the app was

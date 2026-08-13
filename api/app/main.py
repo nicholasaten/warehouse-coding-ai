@@ -8,6 +8,7 @@ from app.routers import (
     auth,
     config,
     dashboard,
+    exports,
     locations,
     merge_suggestions,
     raw_import,
@@ -39,6 +40,7 @@ app.include_router(recommendations.router)
 app.include_router(users.router)
 app.include_router(revisions.router)
 app.include_router(raw_import.router)
+app.include_router(exports.router)
 
 
 @app.get("/health")
