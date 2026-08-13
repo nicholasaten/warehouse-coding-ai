@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --paper: #eef1f5;
+  --card: #ffffff;
+  --ink: #121820;
+  --ink-dim: #58636f;
+  --line: rgba(18, 24, 32, 0.12);
+  --line-strong: rgba(18, 24, 32, 0.24);
+
+  /* Industrial steel blue -- deliberately distinct from the sibling
+     readiness-tracker app's teal/paper identity, grounded in the
+     warehouse/logistics subject rather than reused wholesale. */
+  --accent: #2b6a93;
+  --accent-deep: #163e58;
+  --accent-wash: rgba(43, 106, 147, 0.08);
+
+  /* Amber "signal" -- used for AI-generated content (recommendations,
+     explanations) to visually set it apart from deterministic data,
+     distinct from both the brand accent and the status palette below. */
+  --signal: #c2740c;
+  --signal-wash: rgba(194, 116, 12, 0.1);
+
+  --status-good: #0ca30c;
+  --status-good-wash: rgba(12, 163, 12, 0.12);
+  --status-warning: #c2740c;
+  --status-warning-wash: rgba(194, 116, 12, 0.16);
+  --status-critical: #c23b3b;
+  --status-critical-wash: rgba(194, 59, 59, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0d1217;
+    --card: #151b21;
+    --ink: #e6ebf0;
+    --ink-dim: #97a3ad;
+    --line: rgba(230, 235, 240, 0.12);
+    --line-strong: rgba(230, 235, 240, 0.24);
+
+    --accent: #5b9dc7;
+    --accent-deep: #bfe0f2;
+    --accent-wash: rgba(91, 157, 199, 0.14);
+
+    --signal: #e0a542;
+    --signal-wash: rgba(224, 165, 66, 0.16);
+
+    --status-good: #1fbf3a;
+    --status-good-wash: rgba(31, 191, 58, 0.18);
+    --status-warning: #e0a542;
+    --status-warning-wash: rgba(224, 165, 66, 0.16);
+    --status-critical: #e2615f;
+    --status-critical-wash: rgba(226, 97, 95, 0.16);
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #0d1217;
+  --card: #151b21;
+  --ink: #e6ebf0;
+  --ink-dim: #97a3ad;
+  --line: rgba(230, 235, 240, 0.12);
+  --line-strong: rgba(230, 235, 240, 0.24);
+
+  --accent: #5b9dc7;
+  --accent-deep: #bfe0f2;
+  --accent-wash: rgba(91, 157, 199, 0.14);
+
+  --signal: #e0a542;
+  --signal-wash: rgba(224, 165, 66, 0.16);
+
+  --status-good: #1fbf3a;
+  --status-good-wash: rgba(31, 191, 58, 0.18);
+  --status-warning: #e0a542;
+  --status-warning-wash: rgba(224, 165, 66, 0.16);
+  --status-critical: #e2615f;
+  --status-critical-wash: rgba(226, 97, 95, 0.16);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+::selection {
+  background: var(--accent-wash);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}

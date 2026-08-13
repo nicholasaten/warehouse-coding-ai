@@ -1,0 +1,9 @@
+api/.venv/
+api/.env
+api/__pycache__/
+api/**/__pycache__/
+api/.pytest_cache/
+web/node_modules/
+web/.next/
+web/.env.local
+*.pyc
