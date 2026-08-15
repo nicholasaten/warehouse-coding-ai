@@ -660,6 +660,73 @@ re-uploadable through the same page, unchanged, no reformatting.
   mean changing `ingest_location_master`'s own validation rules, a
   separate decision from building the export.
 
+### Phase 12 -- PIC acknowledgment workflow (the reverse of the Revision workflow)
+
+Requested directly: the PIC for a Hospital Unit needs their own dashboard
+showing how many Warehouses/Locations they still need to review, and an
+explicit way to confirm they agree with the current coding -- with the
+admin able to see that confirmation too. This is the mirror image of the
+existing PIC-submits-a-Revision workflow from Phase 5: there, a PIC
+proposes a change and an admin reviews it; here, an admin creates/edits a
+Warehouse or Location and the **PIC** reviews it.
+
+- `pic_acknowledged_at`/`pic_acknowledged_by` added to both Warehouse and
+  Location (migration `0011`). NULL means "not yet reviewed" -- true for
+  every newly-created row, and reset back to NULL by any subsequent edit
+  (admin's direct PATCH, or an applied Revision -- both paths funnel
+  through the same reset logic) since an old acknowledgment stops meaning
+  anything once the coding underneath it changes.
+- `needs_pic_review` is a Pydantic `computed_field` on `WarehouseRead`/
+  `LocationRead`, derived straight from `pic_acknowledged_at` -- unlike
+  `has_pending_revision` (which needs a separate Revision-table query per
+  endpoint and has to be set manually each time), this one is always
+  correct automatically on every endpoint that returns a Warehouse or
+  Location, with no risk of an endpoint forgetting to set it.
+- `POST /warehouses/{id}/acknowledge` / `POST /locations/{id}/acknowledge`
+  -- PIC-only, scoped to their own Hospital Unit (never trusts a
+  client-passed site, same pattern as every other PIC-facing endpoint).
+- `has_pending_pic_review` filter added to `GET /warehouses`/
+  `GET /locations`, mirroring the existing `has_pending_revision` filter
+  exactly.
+- `GET /dashboard/pic-summary` -- PIC-only, same response shape as the
+  admin's `GET /dashboard/summary` but scoped to the PIC's own site
+  (`warehouse_summary`/`location_summary` gained an optional `site_id`
+  parameter, backward-compatible with the admin's existing system-wide
+  call).
+- Frontend: `/dashboard` is now role-aware -- admin still sees the
+  system-wide summary + AI recommendations, PIC sees a new dashboard
+  (`PicDashboard`) showing stat tiles for "Warehouses/Locations to
+  Accept," the actual pending items (reusing the existing
+  `WarehouseTable`/`LocationTable` components directly, so the styling
+  and the new Accept button/badge automatically match everywhere else
+  those tables appear), and their own site's health stats below. Both
+  post-login redirects now send everyone to `/dashboard` instead of
+  branching PIC to `/warehouses`. An "Accept" button (PIC-only) and an
+  "Awaiting PIC Review"/"PIC Confirmed" badge (visible to both roles) were
+  added to the Warehouses/Locations tables directly, so admin can see
+  agreement status without leaving their existing monitoring view.
+- 12 new HTTP-level tests (`TestClient`, real request/response cycles,
+  not just service-layer calls) covering: new rows start unacknowledged,
+  PIC can acknowledge, admin cannot (403), a PIC cannot acknowledge
+  another site's warehouse (403), an admin PATCH resets acknowledgment,
+  an *approved Revision* also resets it (proving the shared reset logic
+  in `_apply_value` actually fires from that path too, not just the
+  direct-PATCH path), the `has_pending_pic_review` filter, the same set
+  for Locations, and the PIC dashboard summary's site scoping (including
+  that admin gets a 403 from it). 137 tests total.
+- **Live-verified the complete loop against the real Neon database**, not
+  just SQLite: created a disposable Warehouse as a real admin account,
+  confirmed a real PIC account (scoped to that Hospital Unit) saw it on
+  their Dashboard with the correct pending count and an "Accept" button,
+  clicked Accept, confirmed the acknowledgment persisted with the correct
+  timestamp and the PIC's own user id, confirmed the row correctly
+  disappeared from the PIC's own pending list, then switched to the admin
+  view and confirmed the badge read "PIC Confirmed." Finally edited the
+  warehouse's capacity as admin and confirmed the badge flipped straight
+  back to "Awaiting PIC Review" -- proving the reset-on-edit behavior
+  live, not just in a unit test. Cleaned up the disposable warehouse and
+  both throwaway verification accounts (admin + PIC) afterward.
+
 ### Shipping to real hosting (Vercel + Render)
 
 Moved off the Cloudflare quick-tunnel setup (Phase 6d) once the app was

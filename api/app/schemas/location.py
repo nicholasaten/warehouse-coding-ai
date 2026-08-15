@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 
 
 class LocationCreate(BaseModel):
@@ -45,6 +45,13 @@ class LocationRead(BaseModel):
     layout_y: float | None
     layout_width: float | None
     layout_height: float | None
+    pic_acknowledged_at: datetime | None
+    pic_acknowledged_by: uuid.UUID | None
+
+    @computed_field
+    @property
+    def needs_pic_review(self) -> bool:
+        return self.pic_acknowledged_at is None
 
     class Config:
         from_attributes = True

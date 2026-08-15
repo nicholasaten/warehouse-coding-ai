@@ -9,7 +9,7 @@ from app.db.session import get_db
 from app.models.revision import Revision
 from app.models.warehouse import Warehouse
 from app.schemas.warehouse import WarehouseCreate, WarehouseMerge, WarehouseRead, WarehouseUpdate
-from app.services.warehouse_service import create_warehouse, delete_warehouse, merge_warehouse
+from app.services.warehouse_service import acknowledge_warehouse, create_warehouse, delete_warehouse, merge_warehouse
 
 router = APIRouter(prefix="/warehouses", tags=["warehouses"], dependencies=[Depends(get_current_user)])
 
@@ -19,13 +19,16 @@ def list_warehouses(
     site_id: uuid.UUID | None = None,
     is_active: bool | None = None,
     has_pending_revision: bool | None = None,
+    has_pending_pic_review: bool | None = None,
     current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[WarehouseRead]:
     """Backs Admin Monitoring (Review Workflow item #1): filter by Hospital
-    Code (site_id), status (is_active), and revision status
+    Code (site_id), status (is_active), revision status
     (has_pending_revision, computed below -- Warehouse has no such column
-    of its own)."""
+    of its own), and PIC-acknowledgment status (has_pending_pic_review --
+    true means pic_acknowledged_at is still NULL, i.e. nobody has signed
+    off on the current coding yet)."""
     query = select(Warehouse).order_by(Warehouse.generated_code)
     if current_user.role == "pic":
         # A PIC can only ever see their own Hospital Unit's warehouses --
@@ -47,6 +50,9 @@ def list_warehouses(
     for warehouse in warehouses:
         pending = warehouse.id in pending_ids
         if has_pending_revision is not None and pending != has_pending_revision:
+            continue
+        needs_review = warehouse.pic_acknowledged_at is None
+        if has_pending_pic_review is not None and needs_review != has_pending_pic_review:
             continue
         item = WarehouseRead.model_validate(warehouse)
         item.has_pending_revision = pending
@@ -101,9 +107,29 @@ def update_warehouse(warehouse_id: uuid.UUID, payload: WarehouseUpdate, db: Sess
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Warehouse not found")
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(warehouse, field, value)
+    # The coding just changed -- any earlier PIC sign-off no longer
+    # reflects what's actually there, so it needs a fresh review.
+    warehouse.pic_acknowledged_at = None
+    warehouse.pic_acknowledged_by = None
     db.commit()
     db.refresh(warehouse)
     return warehouse
+
+
+@router.post("/{warehouse_id}/acknowledge", response_model=WarehouseRead, dependencies=[Depends(require_role("pic"))])
+def acknowledge_warehouse_endpoint(
+    warehouse_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)
+) -> Warehouse:
+    """PIC confirms they've reviewed this warehouse's current coding and
+    agree with it -- see warehouse_service.acknowledge_warehouse's
+    docstring. Scoped to the PIC's own Hospital Unit, same as every other
+    PIC-facing endpoint -- never trusts a client-passed site."""
+    warehouse = db.get(Warehouse, warehouse_id)
+    if warehouse is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Warehouse not found")
+    if warehouse.site_id != current_user.site_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not permitted")
+    return acknowledge_warehouse(db, warehouse_id, current_user.id)
 
 
 @router.post(

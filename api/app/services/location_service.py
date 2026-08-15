@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -182,6 +183,20 @@ def update_location_layout(
     location.layout_y = y
     location.layout_width = width
     location.layout_height = height
+    db.commit()
+    db.refresh(location)
+    return location
+
+
+def acknowledge_location(db: Session, location_id: uuid.UUID, acknowledged_by: uuid.UUID) -> Location:
+    """The PIC for this Location's Hospital Unit confirms they've
+    reviewed its current coding and agree with it. Same "cleared on any
+    edit" semantics as acknowledge_warehouse."""
+    location = db.get(Location, location_id)
+    if location is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not found")
+    location.pic_acknowledged_at = datetime.now(timezone.utc)
+    location.pic_acknowledged_by = acknowledged_by
     db.commit()
     db.refresh(location)
     return location

@@ -37,3 +37,14 @@ class Warehouse(Base):
     capacity: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # NULL means "the PIC for this Hospital Unit hasn't reviewed the
+    # current coding yet" -- true for every newly-created Warehouse, and
+    # reset back to NULL by any subsequent change to it (admin's direct
+    # PATCH, or an applied Revision -- see _apply_value in
+    # revision_service.py) since the coding a PIC once agreed to may no
+    # longer be what's actually there.
+    pic_acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    pic_acknowledged_by: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )

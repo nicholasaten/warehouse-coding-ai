@@ -7,6 +7,7 @@ module is where that side effect is applied and persisted, not just the
 new row."""
 
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -81,6 +82,22 @@ def create_warehouse(
     db.commit()
     db.refresh(new_warehouse)
     return new_warehouse
+
+
+def acknowledge_warehouse(db: Session, warehouse_id: uuid.UUID, acknowledged_by: uuid.UUID) -> Warehouse:
+    """The PIC for this Warehouse's Hospital Unit confirms they've
+    reviewed its current coding and agree with it. Cleared back to
+    "needs review" by any subsequent edit -- see _apply_value in
+    revision_service.py and update_warehouse's PATCH endpoint -- since an
+    old acknowledgment stops meaning anything once the coding changes."""
+    warehouse = db.get(Warehouse, warehouse_id)
+    if warehouse is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Warehouse not found")
+    warehouse.pic_acknowledged_at = datetime.now(timezone.utc)
+    warehouse.pic_acknowledged_by = acknowledged_by
+    db.commit()
+    db.refresh(warehouse)
+    return warehouse
 
 
 def delete_warehouse(db: Session, warehouse_id: uuid.UUID) -> None:

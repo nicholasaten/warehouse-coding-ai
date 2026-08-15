@@ -20,6 +20,8 @@ excel_ingest_service / merge_suggestion_service). The one genuinely
 after-the-fact-only signal is a warehouse with zero locations, which is
 what `empty_warehouses` below actually means.
 """
+import uuid
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -44,8 +46,11 @@ def _occupancy_status(location_count: int, capacity: int | None) -> str:
     return "normal"
 
 
-def warehouse_summary(db: Session) -> dict:
-    warehouses = list(db.scalars(select(Warehouse)).all())
+def warehouse_summary(db: Session, site_id: uuid.UUID | None = None) -> dict:
+    query = select(Warehouse)
+    if site_id is not None:
+        query = query.where(Warehouse.site_id == site_id)
+    warehouses = list(db.scalars(query).all())
     counts = dict(
         db.execute(
             select(Location.warehouse_id, func.count(Location.id)).group_by(Location.warehouse_id)
@@ -78,11 +83,19 @@ def warehouse_summary(db: Session) -> dict:
     }
 
 
-def location_summary(db: Session) -> dict:
-    total_locations = db.scalar(select(func.count(Location.id))) or 0
-    pending_merge_suggestions = db.scalar(
-        select(func.count(MergeSuggestion.id)).where(MergeSuggestion.status == "pending")
-    ) or 0
+def location_summary(db: Session, site_id: uuid.UUID | None = None) -> dict:
+    loc_query = select(func.count(Location.id))
+    merge_query = select(func.count(MergeSuggestion.id)).where(MergeSuggestion.status == "pending")
+    if site_id is not None:
+        loc_query = loc_query.join(Warehouse, Warehouse.id == Location.warehouse_id).where(
+            Warehouse.site_id == site_id
+        )
+        merge_query = merge_query.join(Warehouse, Warehouse.id == MergeSuggestion.warehouse_id).where(
+            Warehouse.site_id == site_id
+        )
+
+    total_locations = db.scalar(loc_query) or 0
+    pending_merge_suggestions = db.scalar(merge_query) or 0
 
     return {
         "total_locations": total_locations,

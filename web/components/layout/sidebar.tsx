@@ -7,7 +7,7 @@ import { Boxes, ClipboardCheck, GitMerge, LayoutDashboard, Settings, Sparkles, U
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 
-const adminOnlyItems = new Set(["/dashboard", "/uploads", "/raw-import", "/merge-suggestions", "/config", "/users"]);
+const adminOnlyItems = new Set(["/uploads", "/raw-import", "/merge-suggestions", "/config", "/users"]);
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },

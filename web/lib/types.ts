@@ -47,6 +47,9 @@ export type Warehouse = {
   is_active: boolean;
   created_at: string;
   has_pending_revision: boolean;
+  pic_acknowledged_at: string | null;
+  pic_acknowledged_by: string | null;
+  needs_pic_review: boolean;
 };
 
 export type Location = {
@@ -64,6 +67,9 @@ export type Location = {
   layout_y: number | null;
   layout_width: number | null;
   layout_height: number | null;
+  pic_acknowledged_at: string | null;
+  pic_acknowledged_by: string | null;
+  needs_pic_review: boolean;
 };
 
 export type UserAccount = {

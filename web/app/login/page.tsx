@@ -22,8 +22,8 @@ export default function LoginPage() {
     setError(null);
     setIsSubmitting(true);
     try {
-      const loggedInUser = await login(email, password);
-      router.replace(loggedInUser.role === "admin" ? "/dashboard" : "/warehouses");
+      await login(email, password);
+      router.replace("/dashboard");
     } catch (err) {
       setError(err instanceof ApiError && err.status === 401 ? "Invalid email or password." : "Could not reach the server.");
     } finally {

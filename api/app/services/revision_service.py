@@ -114,6 +114,10 @@ def _get_pending_revision(db: Session, revision_id: uuid.UUID) -> Revision:
 def _apply_value(entity: Warehouse | Location, value: dict[str, Any]) -> None:
     for field, new_value in value.items():
         setattr(entity, field, new_value)
+    # The coding just changed -- any earlier PIC acknowledgment no longer
+    # reflects what's actually there, so it needs to be re-confirmed.
+    entity.pic_acknowledged_at = None
+    entity.pic_acknowledged_by = None
 
 
 def approve_revision(db: Session, revision_id: uuid.UUID, reviewed_by: uuid.UUID) -> Revision:

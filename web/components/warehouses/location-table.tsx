@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRightLeft, Trash2 } from "lucide-react";
+import { ArrowRightLeft, CheckCircle2, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,21 @@ function LocationRow({
   const [mode, setMode] = useState<"edit" | "request" | "reassign" | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [ackError, setAckError] = useState<string | null>(null);
+  const [isAcknowledging, setIsAcknowledging] = useState(false);
+
+  async function handleAcknowledge() {
+    setIsAcknowledging(true);
+    setAckError(null);
+    try {
+      await apiJson(`/locations/${location.id}/acknowledge`, { method: "POST" });
+      onChanged();
+    } catch (err) {
+      setAckError(err instanceof ApiError ? err.message : "Could not confirm this location.");
+    } finally {
+      setIsAcknowledging(false);
+    }
+  }
 
   async function handleDelete() {
     if (!window.confirm(`Delete location "${location.generated_code}" (${location.description})? This cannot be undone.`)) {
@@ -59,6 +74,11 @@ function LocationRow({
           <div className="flex flex-wrap items-center gap-1.5">
             {!location.is_active && <Badge tone="neutral" label="Inactive" />}
             {location.has_pending_revision && <Badge tone="warning" label="Revision Pending" />}
+            {location.needs_pic_review ? (
+              <Badge tone="warning" label="Awaiting PIC Review" />
+            ) : (
+              <Badge tone="good" label="PIC Confirmed" />
+            )}
           </div>
         </TD>
         <TD>
@@ -69,6 +89,12 @@ function LocationRow({
               onEdit={() => setMode("edit")}
               onRequestRevision={() => setMode("request")}
             />
+            {!isAdmin && location.needs_pic_review && (
+              <Button variant="ghost" disabled={isAcknowledging} onClick={handleAcknowledge}>
+                <CheckCircle2 className="h-4 w-4" />
+                {isAcknowledging ? "Confirming…" : "Accept"}
+              </Button>
+            )}
             {isAdmin && (
               <Button variant="ghost" disabled={isDeleting} onClick={() => setMode("reassign")}>
                 <ArrowRightLeft className="h-4 w-4" />
@@ -83,6 +109,7 @@ function LocationRow({
             )}
           </div>
           {deleteError && <p className="mt-1 text-xs text-status-critical">{deleteError}</p>}
+          {ackError && <p className="mt-1 text-xs text-status-critical">{ackError}</p>}
         </TD>
       </TR>
       {mode && (

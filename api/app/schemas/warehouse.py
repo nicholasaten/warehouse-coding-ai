@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 
 
 class WarehouseCreate(BaseModel):
@@ -42,6 +42,17 @@ class WarehouseRead(BaseModel):
     is_active: bool
     created_at: datetime
     has_pending_revision: bool = False
+    pic_acknowledged_at: datetime | None
+    pic_acknowledged_by: uuid.UUID | None
+
+    @computed_field
+    @property
+    def needs_pic_review(self) -> bool:
+        """Derived straight from pic_acknowledged_at, unlike
+        has_pending_revision -- that one needs a separate Revision query
+        per endpoint, this one doesn't, so it's always correct here
+        without every route having to remember to set it."""
+        return self.pic_acknowledged_at is None
 
     class Config:
         from_attributes = True

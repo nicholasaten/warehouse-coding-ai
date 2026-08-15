@@ -58,3 +58,10 @@ class Location(Base):
     layout_y: Mapped[float | None] = mapped_column(Float, nullable=True)
     layout_width: Mapped[float | None] = mapped_column(Float, nullable=True)
     layout_height: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # Same "needs PIC review" semantics as Warehouse.pic_acknowledged_at --
+    # see that column's comment.
+    pic_acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    pic_acknowledged_by: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )

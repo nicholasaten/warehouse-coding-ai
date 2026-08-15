@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { GitMerge, LayoutGrid, Trash2 } from "lucide-react";
+import { CheckCircle2, GitMerge, LayoutGrid, Trash2 } from "lucide-react";
 
 import { Badge, OccupancyBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,21 @@ function WarehouseRow({
   const [mode, setMode] = useState<"edit" | "request" | "merge" | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [ackError, setAckError] = useState<string | null>(null);
+  const [isAcknowledging, setIsAcknowledging] = useState(false);
+
+  async function handleAcknowledge() {
+    setIsAcknowledging(true);
+    setAckError(null);
+    try {
+      await apiJson(`/warehouses/${warehouse.id}/acknowledge`, { method: "POST" });
+      onChanged();
+    } catch (err) {
+      setAckError(err instanceof ApiError ? err.message : "Could not confirm this warehouse.");
+    } finally {
+      setIsAcknowledging(false);
+    }
+  }
 
   async function handleDelete() {
     if (
@@ -69,6 +84,11 @@ function WarehouseRow({
           <div className="flex flex-wrap items-center gap-1.5">
             {!warehouse.is_active && <Badge tone="neutral" label="Inactive" />}
             {warehouse.has_pending_revision && <Badge tone="warning" label="Revision Pending" />}
+            {warehouse.needs_pic_review ? (
+              <Badge tone="warning" label="Awaiting PIC Review" />
+            ) : (
+              <Badge tone="good" label="PIC Confirmed" />
+            )}
           </div>
         </TD>
         <TD>
@@ -79,6 +99,12 @@ function WarehouseRow({
               onEdit={() => setMode("edit")}
               onRequestRevision={() => setMode("request")}
             />
+            {!isAdmin && warehouse.needs_pic_review && (
+              <Button variant="ghost" disabled={isAcknowledging} onClick={handleAcknowledge}>
+                <CheckCircle2 className="h-4 w-4" />
+                {isAcknowledging ? "Confirming…" : "Accept"}
+              </Button>
+            )}
             {isAdmin && (
               <Link
                 href={`/warehouses/${warehouse.id}/layout`}
@@ -102,6 +128,7 @@ function WarehouseRow({
             )}
           </div>
           {deleteError && <p className="mt-1 text-xs text-status-critical">{deleteError}</p>}
+          {ackError && <p className="mt-1 text-xs text-status-critical">{ackError}</p>}
         </TD>
       </TR>
       {mode && (

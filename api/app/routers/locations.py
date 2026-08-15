@@ -11,6 +11,7 @@ from app.models.revision import Revision
 from app.models.warehouse import Warehouse
 from app.schemas.location import LocationCreate, LocationLayoutUpdate, LocationRead, LocationReassignWarehouse, LocationUpdate
 from app.services.location_service import (
+    acknowledge_location,
     create_location,
     delete_location,
     reassign_location_warehouse,
@@ -26,6 +27,7 @@ def list_locations(
     site_id: uuid.UUID | None = None,
     is_active: bool | None = None,
     has_pending_revision: bool | None = None,
+    has_pending_pic_review: bool | None = None,
     current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[LocationRead]:
@@ -57,6 +59,9 @@ def list_locations(
     for location in locations:
         pending = location.id in pending_ids
         if has_pending_revision is not None and pending != has_pending_revision:
+            continue
+        needs_review = location.pic_acknowledged_at is None
+        if has_pending_pic_review is not None and needs_review != has_pending_pic_review:
             continue
         item = LocationRead.model_validate(location)
         item.has_pending_revision = pending
@@ -106,9 +111,30 @@ def update_location(location_id: uuid.UUID, payload: LocationUpdate, db: Session
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not found")
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(location, field, value)
+    # The coding just changed -- any earlier PIC sign-off no longer
+    # reflects what's actually there, so it needs a fresh review.
+    location.pic_acknowledged_at = None
+    location.pic_acknowledged_by = None
     db.commit()
     db.refresh(location)
     return location
+
+
+@router.post("/{location_id}/acknowledge", response_model=LocationRead, dependencies=[Depends(require_role("pic"))])
+def acknowledge_location_endpoint(
+    location_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)
+) -> Location:
+    """PIC confirms they've reviewed this location's current coding and
+    agree with it -- see location_service.acknowledge_location's
+    docstring. Scoped through the Location's Warehouse to the PIC's own
+    Hospital Unit, same pattern as get_location above."""
+    location = db.get(Location, location_id)
+    if location is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not found")
+    warehouse = db.get(Warehouse, location.warehouse_id)
+    if warehouse is None or warehouse.site_id != current_user.site_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not permitted")
+    return acknowledge_location(db, location_id, current_user.id)
 
 
 @router.patch(
